@@ -1,0 +1,22 @@
+[package]
+name = "sibylline-clean"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Prompt injection detection primitives"
+repository = "https://github.com/nathan/sibylline-clean"
+keywords = ["prompt-injection", "llm", "security", "detection"]
+categories = ["text-processing"]
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+regex = { workspace = true }
+aho-corasick = { workspace = true }
+unicode-normalization = { workspace = true }
+serde = { version = "1", features = ["derive"], optional = true }
+
+[features]
+default = []
+serde = ["dep:serde"]

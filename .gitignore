@@ -1,0 +1,38 @@
+__pycache__/
+*.egg-info/
+dist/
+build/
+target/
+*.so
+*.pyd
+*.dylib
+
+# Virtual environments
+.venv/
+venv/
+
+# Benchmark outputs
+benchmarks/results/*.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# WASM build output
+crates/sibylline-clean-wasm/pkg/
+
+# Python caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.pyc
+
+# Environment / secrets
+.env
+.env.*

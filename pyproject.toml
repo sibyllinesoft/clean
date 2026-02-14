@@ -1,0 +1,92 @@
+[project]
+name = "sibylline-clean"
+version = "0.1.0"
+description = "Prompt injection detection library for LLM applications"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Nathan" }]
+keywords = ["prompt-injection", "llm", "security", "detection"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+]
+dependencies = []
+
+[project.optional-dependencies]
+ml = [
+    "numpy>=1.24.0",
+    "onnxruntime>=1.17.0",
+    "tokenizers>=0.15.0",
+    "huggingface-hub>=0.20.0",
+    "scikit-learn>=1.3.0",
+]
+normalization = [
+    "confusable-homoglyphs>=3.2.0",
+]
+fuzzy = [
+    "rapidfuzz>=3.5.0",
+]
+promptshield = [
+    "torch>=2.0.0",
+    "transformers>=4.35.0",
+    "sentencepiece>=0.1.99",
+]
+crf = [
+    "sklearn-crfsuite>=0.3.6",
+]
+multilingual = [
+    "pyyaml>=6.0",
+]
+content = [
+    "pyyaml>=6.0",
+]
+all = [
+    "sibylline-clean[ml,normalization,fuzzy,multilingual]",
+]
+benchmark = [
+    "sibylline-clean[all,promptshield,crf]",
+    "datasets>=2.14.0",
+    "scikit-learn>=1.3.0",
+]
+training = [
+    "sibylline-clean[all]",
+    "datasets>=2.14.0",
+]
+dev = [
+    "sibylline-clean[all]",
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+python-source = "src"
+module-name = "sibylline_clean._native"
+manifest-path = "crates/sibylline-clean-python/Cargo.toml"
+features = ["pyo3/extension-module"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+ignore = ["E501", "SIM105", "SIM108", "SIM102", "SIM117"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/parity/test_native_parity.py" = ["E402"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

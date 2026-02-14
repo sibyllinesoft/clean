@@ -1,0 +1,19 @@
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[workspace.dependencies]
+regex = "1"
+aho-corasick = "1"
+unicode-normalization = "0.1"
+
+# Optimized for WASM binary size
+[profile.wasm-release]
+inherits = "release"
+opt-level = "s"
+lto = true
