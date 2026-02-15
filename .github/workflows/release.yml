@@ -63,7 +63,7 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_TOKEN }}
-          verbose: true
+          skip-existing: true
           attestations: false
 
   # ── Rust crate (crates.io) ──────────────────────────────────────────
