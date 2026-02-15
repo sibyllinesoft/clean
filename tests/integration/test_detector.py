@@ -9,9 +9,10 @@ class TestInjectionDetector:
     """Tests for the InjectionDetector analyze() API."""
 
     def setup_method(self):
-        # Pattern-only mode for tests (no ML deps required)
+        # Explicit heuristic mode — tests check pattern-level features
         self.detector = InjectionDetector(
             threshold=0.3,
+            method="heuristic",
             use_embeddings=False,
         )
 

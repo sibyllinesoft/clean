@@ -34,9 +34,9 @@ class InjectionDetector:
     """Detect prompt injection attempts in text content.
 
     Delegates to a pluggable DetectionMethod selected by name.
-    The default 'heuristic' method uses pattern extraction, motif matching,
-    and optional ML classification. Alternative methods can be registered
-    via the methods registry.
+    The default method is 'semi-markov-crf', which provides the best overall
+    detection (AUC, F1) and is the fastest method. Falls back to 'heuristic'
+    if sklearn-crfsuite is not installed.
     """
 
     _DEFAULT_THRESHOLD = 0.3
@@ -44,7 +44,7 @@ class InjectionDetector:
     def __init__(
         self,
         threshold: float | None = None,
-        method: str = "heuristic",
+        method: str | None = None,
         *,
         use_embeddings: bool = True,
         use_windowing: bool = True,
@@ -58,7 +58,8 @@ class InjectionDetector:
         Args:
             threshold: Detection threshold (0.0 to 1.0). Higher = fewer false positives.
                        If not set, uses the method's default_threshold or 0.3.
-            method: Name of the detection method to use (default: "heuristic").
+            method: Name of the detection method to use. Defaults to 'semi-markov-crf',
+                    falling back to 'heuristic' if sklearn-crfsuite is not installed.
             use_embeddings: Whether to use embedding-based detection (heuristic method).
             use_windowing: Whether to use sliding window analysis (heuristic method).
             lazy_load: Whether to lazy-load heavy components.
@@ -67,6 +68,14 @@ class InjectionDetector:
             **method_kwargs: Additional keyword arguments passed to the method constructor.
         """
         self._normalizer = TextNormalizer()
+
+        if method is None:
+            try:
+                import sklearn_crfsuite  # noqa: F401
+
+                method = "semi-markov-crf"
+            except ImportError:
+                method = "heuristic"
 
         # Look up and instantiate the detection method
         method_cls = get_method(method)
