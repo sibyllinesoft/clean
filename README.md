@@ -32,9 +32,11 @@ Every layer adds signal. The Semi-Markov CRF method (layers 1-3 and 5) is Clean'
 
 ## Benchmarks
 
-All numbers measured on the [PromptShield](https://huggingface.co/datasets/hendzh/PromptShield) test split (23,516 samples). TPR @ FPR measures what percentage of attacks are caught at a given false positive rate -- the metric that matters for production, where false positives cost you.
+TPR @ FPR measures what percentage of attacks are caught at a given false positive rate -- the metric that matters for production, where false positives cost you. Each table below is from a single benchmark using consistent methodology; numbers are not mixed across benchmarks.
 
-### Clean methods
+### Clean methods on PromptShield
+
+Measured on the [PromptShield](https://huggingface.co/datasets/hendzh/PromptShield) test split (23,516 samples):
 
 | Method | Params | AUC | F1 | TPR@1%FPR | TPR@0.5% | Requires |
 |--------|--------|-----|------|-----------|----------|----------|
@@ -55,9 +57,45 @@ Numbers from [Hendler et al. 2025](https://arxiv.org/abs/2501.15145) (same bench
 | PromptShield (DeBERTa) | 184M | 43.22% | 40.5% | 31.5% | Research |
 | PromptShield (Llama 8B) | 8B | **94.80%** | 87.8% | 65.3% | Research, GPU |
 
+### Sentinel public benchmarks
+
+F1 scores across four public datasets, from [Qualifire (2025)](https://arxiv.org/abs/2506.05446):
+
+| Model | Params | wildjailbreak | jailbreak-classif. | deepset/PI | qualifire | Avg F1 |
+|-------|--------|---------------|-------------------|------------|-----------|--------|
+| Sentinel (ModernBERT) | 395M | **0.935** | **0.985** | **0.857** | **0.976** | **0.938** |
+| ProtectAI DeBERTa v2 | 184M | 0.733 | 0.915 | 0.536 | 0.652 | 0.709 |
+
+### Meta Prompt Guard evaluation
+
+From [Meta LlamaFirewall (2025)](https://arxiv.org/abs/2505.03574) -- jailbreak detection on Meta's own eval set:
+
+| Model | Params | AUC (en) | Recall@1%FPR (en) | AUC (multi) | Latency (A100) |
+|-------|--------|----------|-------------------|-------------|----------------|
+| Prompt Guard 2 86M | 86M | **0.998** | **97.5%** | **0.995** | 92 ms |
+| Prompt Guard 2 22M | 22M | 0.995 | 88.7% | 0.942 | **19 ms** |
+| Prompt Guard 1 | 279M | 0.987 | 21.2% | 0.983 | 92 ms |
+
+### AgentDojo attack prevention
+
+Real-world attack prevention rate (APR @ 3% utility reduction), from [Meta LlamaFirewall (2025)](https://arxiv.org/abs/2505.03574):
+
+| Model | APR |
+|-------|-----|
+| Prompt Guard 2 86M | **81.2%** |
+| Prompt Guard 2 22M | 78.4% |
+| ProtectAI DeBERTa | 22.2% |
+| Deepset | 13.5% |
+
+### Takeaway
+
 Clean's Semi-Markov CRF achieves the best AUC (0.795) and F1 (0.59) of any model that doesn't require a GPU, outperforming both ProtectAI DeBERTa models (184M parameters each, requiring PyTorch and GPU infrastructure). The zero-dependency heuristic fallback still beats ProtectAI v2 at low false positive rates without downloading a single model weight.
 
-The PromptShield Llama 8B model achieves the highest detection rate, but requires an 8-billion parameter model and GPU infrastructure. Clean occupies a different point in the design space: it trades peak accuracy for zero infrastructure requirements, sub-second latency, and the ability to run anywhere Python runs.
+The larger picture is that benchmark results vary dramatically by evaluation methodology -- ProtectAI reports 99.93% accuracy on its own eval set but scores 1.97% TPR on PromptShield and 0.709 average F1 on Sentinel's benchmarks. Meta's Prompt Guard 2 shows 97.5% recall on its own eval but only 12.78% TPR on PromptShield. No single model dominates across all benchmarks, and self-reported numbers are unreliable predictors of real-world performance.
+
+Clean also changes the calculus on false positive tolerance. Most detectors treat this as a binary gate -- flag the entire input or let it through -- so false positives block legitimate requests entirely. Clean instead applies span-level redaction and tagging: flagged regions are marked or stripped while the rest of the input passes through intact. This makes the cost of a false positive noise rather than denial-of-service, which means you can operate at a higher FPR to catch more attacks without degrading the user experience.
+
+The PromptShield Llama 8B model achieves the highest detection rate on the PromptShield benchmark, but requires an 8-billion parameter model and GPU infrastructure. Clean occupies a different point in the design space: it trades peak accuracy for zero infrastructure requirements, sub-second latency, and the ability to run anywhere Python runs.
 
 ## Installation
 
