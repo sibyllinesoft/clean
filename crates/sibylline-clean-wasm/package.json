@@ -1,7 +1,7 @@
 {
   "name": "sibylline-clean",
   "description": "Prompt injection detection for JavaScript/WASM",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "MIT",
   "keywords": ["prompt-injection", "llm", "security", "wasm"],
   "repository": {

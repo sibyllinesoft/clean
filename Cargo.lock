@@ -246,7 +246,7 @@ dependencies = [
 
 [[package]]
 name = "sibylline-clean"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "aho-corasick",
  "regex",
@@ -256,7 +256,7 @@ dependencies = [
 
 [[package]]
 name = "sibylline-clean-python"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "pyo3",
  "sibylline-clean",
@@ -264,7 +264,7 @@ dependencies = [
 
 [[package]]
 name = "sibylline-clean-wasm"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "js-sys",
  "serde",

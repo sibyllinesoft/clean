@@ -22,15 +22,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: |
-            3.10
-            3.11
-            3.12
-          allow-prereleases: false
+          python-version: "3.12"
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
-          args: --release --out dist --interpreter 3.10 3.11 3.12
+          args: --release --out dist
           manylinux: auto
           sccache: true
       - uses: actions/upload-artifact@v4

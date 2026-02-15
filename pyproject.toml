@@ -1,6 +1,6 @@
 [project]
 name = "sibylline-clean"
-version = "0.1.0"
+version = "0.1.1"
 description = "Prompt injection detection library for LLM applications"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -15,6 +15,8 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Security",
 ]
 dependencies = []
@@ -73,7 +75,7 @@ build-backend = "maturin"
 python-source = "src"
 module-name = "sibylline_clean._native"
 manifest-path = "crates/sibylline-clean-python/Cargo.toml"
-features = ["pyo3/extension-module"]
+features = ["pyo3/extension-module", "pyo3/abi3-py310"]
 
 [tool.ruff]
 target-version = "py310"
