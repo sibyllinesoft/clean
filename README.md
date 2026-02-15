@@ -83,7 +83,7 @@ Measured on the [PromptShield](https://huggingface.co/datasets/hendzh/PromptShie
 
 | Method | Params | AUC | F1 | TPR@1%FPR | TPR@0.5% | Requires |
 |--------|--------|-----|------|-----------|----------|----------|
-| Semi-Markov CRF | ~1MB | **0.795** | **0.59** | 4.1% | 2.1% | sklearn-crfsuite |
+| Semi-Markov CRF | ~1MB | **0.816** | **0.62** | 4.1% | 2.0% | sklearn-crfsuite |
 | Heuristic (pattern-only) | 0 | 0.764 | 0.54 | 8.4% | 4.9% | Nothing |
 
 TPR @ FPR measures what percentage of attacks are caught at a given false positive rate. Because Clean uses span-level redaction rather than binary gating, it can operate at higher FPR thresholds than binary classifiers -- a false positive tags a region rather than blocking the entire input.

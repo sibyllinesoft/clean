@@ -1,6 +1,6 @@
 language: en
 name: English
-version: "1.0"
+version: "1.1"
 
 patterns:
   instruction_override:
@@ -14,6 +14,12 @@ patterns:
     - 'actual\s+instructions?\s*[:=]'
     - 'real\s+instructions?\s*[:=]'
     - 'updated?\s+instructions?\s*[:=]'
+    # context reset patterns
+    - 'start\s+(a\s+)?new\s+(conversation|session|chat|task)'
+    - 'reset\s+(your\s+)?(context|memory|instructions?|state)'
+    - 'clear\s+(your\s+)?(context|history|memory|state)'
+    - '(wipe|erase)\s+(your\s+)?(memory|context|history)'
+    - 'begin\s+(a\s+)?new\s+(session|conversation|chat|context)'
 
   role_injection:
     - 'you\s+are\s+now\s+'
@@ -71,6 +77,34 @@ patterns:
     - 'uncensored\s+(mode|response|version)'
     - '(bypass|skip|avoid)\s+(all\s+)?safeguards?'
 
+  social_engineering:
+    - 'I\s+am\s+(your|the)\s+(developer|creator|admin|owner|engineer|operator)'
+    - 'this\s+is\s+(a\s+)?(security|authorized|routine|scheduled)\s+test'
+    - 'I\s+have\s+(authorization|permission|clearance|access)'
+    - '(my|the)\s+(boss|manager|supervisor|CEO)\s+(told|asked|wants|requires)\s+(me|you)'
+    - '(trust|believe)\s+me'
+    - '(authorized|approved)\s+(by|from)\s+(management|admin|the\s+team)'
+    - 'I\s+am\s+(authorized|permitted|allowed)\s+to'
+    - 'this\s+is\s+(an?\s+)?(emergency|urgent|critical)\s+(request|situation|matter)'
+
+  output_manipulation:
+    - 'respond\s+(only|exclusively)\s+(with|in|using)'
+    - '(do\s+not|don''t|never)\s+(mention|include|say|reveal|discuss|reference)'
+    - '(always|must|only)\s+(respond|reply|answer|say)\s+(with|that|as|in)'
+    - '(your|the)\s+(only|sole)\s+(response|output|reply)\s+(is|should|must|will)\s+be'
+    - 'format\s+(your\s+)?(response|output|reply)\s+(as|like|in)'
+    - '(say|write|output|type)\s+(exactly|only|nothing\s+but|just)'
+    - '(replace|substitute)\s+(your|the)\s+(response|output|answer)'
+    - '(prepend|append|insert)\s+(the\s+following|this)'
+
+  multi_turn:
+    - 'as\s+(we|I)\s+(discussed|agreed|established)\s+(earlier|before|previously)'
+    - '(remember|recall)\s+(when|that|our|what)\s+(you|we|I)'
+    - '(continuing|picking\s+up)\s+(from|where)\s+(our|the)\s+(last|previous)'
+    - 'in\s+(our|the)\s+(last|previous|earlier)\s+(conversation|session|chat)'
+    - 'you\s+(already|previously)\s+(agreed|said|confirmed|promised)'
+    - 'as\s+(per|according\s+to)\s+(our|the)\s+(agreement|arrangement|deal)'
+
   encoding_markers:
     - 'base64\s*[:=]'
     - 'decode\s+(this|the\s+following|below)'
@@ -107,6 +141,13 @@ motifs:
     - 'override previous'
     - 'stop following'
     - 'do not follow'
+    # context reset motifs
+    - 'start a new conversation'
+    - 'reset your context'
+    - 'clear your memory'
+    - 'begin new session'
+    - 'wipe your memory'
+    - 'erase your history'
 
   role_injection:
     - 'you are now'
@@ -158,6 +199,35 @@ motifs:
     - 'chaos mode'
     - 'no censorship'
     - 'bypass safeguards'
+
+  social_engineering:
+    - 'I am your developer'
+    - 'I am the admin'
+    - 'this is a security test'
+    - 'I have authorization'
+    - 'trust me'
+    - 'I am authorized'
+    - 'this is an emergency'
+    - 'my boss told me'
+
+  output_manipulation:
+    - 'respond only with'
+    - 'do not mention'
+    - 'never say'
+    - 'only reply with'
+    - 'say exactly'
+    - 'output nothing but'
+    - 'format your response as'
+    - 'your only response'
+
+  multi_turn:
+    - 'as we discussed'
+    - 'as we agreed'
+    - 'remember when you'
+    - 'you already agreed'
+    - 'continuing from our last'
+    - 'in our previous conversation'
+    - 'you previously confirmed'
 
   delimiters:
     - '[system]'

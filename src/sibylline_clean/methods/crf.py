@@ -1,7 +1,9 @@
 """Semi-Markov CRF detection method — word-level CRF with weak supervision."""
 
+import hashlib
 import math
 import pickle
+import random
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -37,6 +39,15 @@ _INSTRUCTION_KWS = frozenset(
         "guidelines",
         "prior",
         "directions",
+        # context reset
+        "reset",
+        "restart",
+        "clear",
+        "erase",
+        "wipe",
+        "begin",
+        "context",
+        "history",
     }
 )
 _ROLE_KWS = frozenset(
@@ -59,6 +70,18 @@ _ROLE_KWS = frozenset(
         "mode",
         "conversation",
         "session",
+        # social engineering / authority claims
+        "developer",
+        "engineer",
+        "creator",
+        "owner",
+        "authorized",
+        "authority",
+        "permission",
+        "clearance",
+        "security",
+        "testing",
+        "maintenance",
     }
 )
 _ACTION_KWS = frozenset(
@@ -81,6 +104,21 @@ _ACTION_KWS = frozenset(
         "remove",
         "restrictions",
         "limitations",
+        # output manipulation
+        "respond",
+        "reply",
+        "answer",
+        "generate",
+        "write",
+        "produce",
+        "format",
+        "only",
+        "exclusively",
+        "instead",
+        "mention",
+        "include",
+        "exclude",
+        "omit",
     }
 )
 _JAILBREAK_KWS = frozenset(
@@ -102,6 +140,18 @@ _JAILBREAK_KWS = frozenset(
         "safeguards",
         "evil",
         "chaos",
+        # additional jailbreak / adversarial
+        "payload",
+        "vulnerability",
+        "penetration",
+        "obfuscate",
+        "encode",
+        "decode",
+        "workaround",
+        "loophole",
+        "trick",
+        "convince",
+        "manipulate",
     }
 )
 
@@ -116,6 +166,12 @@ _INJECTION_RE = re.compile(
     r"cancel.{0,15}previous|"
     r"critical\s+override|"
     r"do\s+not\s+follow.{0,20}(?:above|previous)|"
+    # context reset
+    r"start\s+(?:a\s+)?new\s+conversation|"
+    r"reset\s+(?:your\s+)?(?:context|memory|instructions)|"
+    r"clear\s+(?:your\s+)?(?:context|history|memory)|"
+    r"begin\s+(?:a\s+)?new\s+(?:session|chat|task)|"
+    r"(?:wipe|erase)\s+(?:your\s+)?(?:memory|context|history)|"
     # identity / role_injection
     r"(?:I\s+have\s+been\s+)?PWNED|"
     r"you\s+are\s+now|"
@@ -125,6 +181,12 @@ _INJECTION_RE = re.compile(
     r"from\s+now\s+on|"
     r"imagine.*you|"
     r"roleplay\s+as|"
+    # social engineering / authority claims
+    r"I\s+am\s+(?:your|the)\s+(?:developer|creator|admin|owner|engineer)|"
+    r"this\s+is\s+a\s+(?:security|authorized|routine)\s+test|"
+    r"I\s+have\s+(?:authorization|permission|clearance)|"
+    r"(?:my|the)\s+(?:boss|manager|supervisor)\s+(?:told|asked|wants)|"
+    r"(?:trust|believe)\s+me\b|"
     # system_manipulation
     r"(?:admin|developer|god|sudo)\s+mode|"
     r"disable.*(?:safety|filters)|"
@@ -132,10 +194,22 @@ _INJECTION_RE = re.compile(
     r"enable\s+(?:unrestricted|unlimited)|"
     # prompt_leak
     r"(?:reveal|show|output|print|display).{0,30}(?:system\s+prompt|instructions|rules)|"
+    # output manipulation / steering
+    r"respond\s+(?:only|exclusively)\s+(?:with|in|using)|"
+    r"(?:do\s+not|don't|never)\s+(?:mention|include|say|reveal|discuss)|"
+    r"(?:always|must|only)\s+(?:respond|reply|answer|say)\s+(?:with|that|as)|"
+    r"(?:your|the)\s+(?:only|sole)\s+(?:response|output|reply)\s+(?:is|should|must)|"
+    r"format\s+(?:your\s+)?(?:response|output|reply)\s+(?:as|like|in)|"
+    # completion attacks
+    r"(?:complete|continue|finish)\s+(?:the|this|my)\s+(?:sentence|text|story|code)|"
+    r"(?:the\s+)?(?:correct|right|expected|proper)\s+(?:answer|response|output)\s+is|"
     # jailbreak
     r"do\s+anything\s+now|"
     r"(?:evil|unrestricted|unfiltered)\s+(?:mode|assistant|ai)|"
     r"no\s+censorship|"
+    # multi-turn
+    r"as\s+(?:we|I)\s+(?:discussed|agreed|established)\s+(?:earlier|before|previously)|"
+    r"(?:remember|recall)\s+(?:when|that|our|what)\s+(?:you|we|I)|"
     # delimiters
     r"(?:###|---)\s*(?:system|instruction|new)|"
     r"\[\s*system\s*\]|"
@@ -143,7 +217,7 @@ _INJECTION_RE = re.compile(
     re.IGNORECASE,
 )
 
-_FEATURE_VERSION = 3
+_FEATURE_VERSION = 4
 _DEFAULT_CACHE = Path.home() / ".cache" / "clean" / f"semi_markov_crf_v{_FEATURE_VERSION}.pkl"
 _MAX_TOKENS = 2000  # truncate very long texts
 _DEFAULT_SPAN_THRESHOLD = 0.5  # marginal P(I) above which a token is "injection"
@@ -384,6 +458,9 @@ _DOC_FLAG_CATEGORIES = (
     "system_manipulation",
     "prompt_leak",
     "jailbreak_keywords",
+    "social_engineering",
+    "output_manipulation",
+    "multi_turn",
     "encoding_markers",
     "suspicious_delimiters",
 )
@@ -509,7 +586,11 @@ def _weak_labels_enriched(
     if "I" in labels:
         return labels
 
-    return None
+    # Tier 5: Full-document fallback — label all tokens as injection.
+    # These are known-positive samples where no pattern/motif/regex/keyword
+    # signal exists.  Noisy but recovers ~896 otherwise-dropped samples.
+    # The CRF's L1/L2 regularization (c1=c2=0.1) prevents overfitting.
+    return ["I"] * n
 
 
 class SemiMarkovCRFMethod(DetectionMethod):
@@ -583,8 +664,128 @@ class SemiMarkovCRFMethod(DetectionMethod):
         except Exception:
             pass
 
+    @staticmethod
+    def _load_training_data(hf_load, train_limit: int | None = None) -> list[tuple[str, bool]]:
+        """Load and deduplicate training data from multiple datasets.
+
+        Returns list of (text, is_injection) tuples.
+        """
+        seen: set[str] = set()
+        samples: list[tuple[str, bool]] = []
+
+        def _add(text: str, is_injection: bool) -> None:
+            h = hashlib.md5(text.encode("utf-8", errors="replace")).hexdigest()
+            if h not in seen:
+                seen.add(h)
+                samples.append((text, is_injection))
+
+        # --- PromptShield (primary) ---
+        print("  [semi-markov-crf] Loading PromptShield training data...")
+        ds = hf_load("hendzh/PromptShield", split="train")
+        if train_limit:
+            ds = ds.select(range(min(train_limit, len(ds))))
+        for row in ds:
+            _add(row["prompt"], bool(row["label"]))
+
+        # --- deepset/prompt-injections (~660 samples, curated) ---
+        try:
+            print("  [semi-markov-crf] Loading deepset/prompt-injections...")
+            ds2 = hf_load("deepset/prompt-injections", split="train")
+            for row in ds2:
+                _add(row["text"], bool(row["label"]))
+        except Exception as e:
+            print(f"  [semi-markov-crf] Skipping deepset/prompt-injections: {e}")
+
+        # --- jackhhao/jailbreak-classification (~16K, cap at 5000) ---
+        _JAILBREAK_CAP = 5000
+        try:
+            print("  [semi-markov-crf] Loading jackhhao/jailbreak-classification...")
+            ds3 = hf_load("jackhhao/jailbreak-classification", split="train")
+            jb_samples: list[tuple[str, bool]] = []
+            for row in ds3:
+                is_inj = row["type"] != "benign"
+                jb_samples.append((row["prompt"], is_inj))
+            if len(jb_samples) > _JAILBREAK_CAP:
+                random.seed(42)
+                jb_samples = random.sample(jb_samples, _JAILBREAK_CAP)
+            for text, is_inj in jb_samples:
+                _add(text, is_inj)
+        except Exception as e:
+            print(f"  [semi-markov-crf] Skipping jackhhao/jailbreak-classification: {e}")
+
+        print(f"  [semi-markov-crf] Total deduplicated samples: {len(samples)}")
+        return samples
+
+    @staticmethod
+    def _generate_sandwich_augmentations(
+        samples: list[tuple[str, bool]],
+        max_augmented: int = 2000,
+    ) -> list[tuple[str, list[str]]]:
+        """Generate sandwich attack samples: benign + injection + benign.
+
+        Embeds injection text within benign context so the CRF learns to
+        detect injections that aren't at the start of a document.
+
+        Returns list of (combined_text, token_labels) tuples.
+        """
+        _BENIGN_PREFIXES = [
+            "Please review the following document and provide feedback. ",
+            "Here is the text from the user's uploaded file: ",
+            "The customer submitted the following message for review: ",
+            "Below is the content extracted from the PDF attachment: ",
+            "Summary of the meeting notes shared by the team: ",
+            "The following paragraph was found in the submitted form: ",
+            "User input received from the web form submission: ",
+            "Content from the external data source is as follows: ",
+        ]
+        _BENIGN_SUFFIXES = [
+            " Thank you for your help with this request.",
+            " Please let me know if you need any additional information.",
+            " End of document content.",
+            " That concludes the submitted material.",
+            " The above text was provided for analysis purposes.",
+            " We appreciate your prompt attention to this matter.",
+            " This content was extracted automatically.",
+            " Please process this according to standard procedures.",
+        ]
+
+        injections = [text for text, is_inj in samples if is_inj and len(text.strip()) > 10]
+        if not injections:
+            return []
+
+        random.seed(42)
+        if len(injections) > max_augmented:
+            injections = random.sample(injections, max_augmented)
+
+        augmented: list[tuple[str, list[str]]] = []
+        for inj_text in injections:
+            prefix = random.choice(_BENIGN_PREFIXES)
+            suffix = random.choice(_BENIGN_SUFFIXES)
+            combined = prefix + inj_text + suffix
+
+            # Build token-level labels
+            tokens = _tokenize(combined)[:_MAX_TOKENS]
+            if not tokens:
+                continue
+            prefix_end = len(prefix)
+            injection_end = prefix_end + len(inj_text)
+            labels = []
+            for _, t_start, t_end in tokens:
+                # Token overlaps with the injection region
+                if t_start >= prefix_end and t_end <= injection_end:
+                    labels.append("I")
+                elif t_start < injection_end and t_end > prefix_end:
+                    # Partial overlap — label as injection
+                    labels.append("I")
+                else:
+                    labels.append("O")
+            augmented.append((combined, labels))
+
+        print(f"  [semi-markov-crf] Generated {len(augmented)} sandwich augmentations")
+        return augmented
+
     def _train(self) -> None:
-        """Train CRF on PromptShield training data with weak supervision."""
+        """Train CRF on multi-source data with weak supervision."""
         try:
             import sklearn_crfsuite
         except ImportError as exc:
@@ -603,28 +804,35 @@ class SemiMarkovCRFMethod(DetectionMethod):
                 "Install with: pip install sibylline-clean[benchmark]"
             ) from exc
 
-        print("  [semi-markov-crf] Loading PromptShield training data...")
-        ds = hf_load("hendzh/PromptShield", split="train")
-        if self._train_limit:
-            ds = ds.select(range(min(self._train_limit, len(ds))))
-
+        samples = self._load_training_data(hf_load, self._train_limit)
         self._ensure_heuristics()
 
-        print(f"  [semi-markov-crf] Extracting features from {len(ds)} samples...")
+        # --- Sandwich augmentation ---
+        augmented = self._generate_sandwich_augmentations(samples)
+
+        print(
+            f"  [semi-markov-crf] Extracting features from {len(samples)} samples"
+            f" + {len(augmented)} augmented..."
+        )
         X_train: list[list[dict]] = []
         y_train: list[list[str]] = []
 
-        for row in ds:
-            prompt = row["prompt"]
-            # Enriched context for LABELS (high-recall weak supervision)
-            ctx = _build_context(prompt, self._pattern_extractor, self._motif_matcher)
-            labels = _weak_labels_enriched(prompt, bool(row["label"]), ctx)
+        for text, is_injection in samples:
+            ctx = _build_context(text, self._pattern_extractor, self._motif_matcher)
+            labels = _weak_labels_enriched(text, is_injection, ctx)
             if not labels:
                 continue
-            # Base features + doc flags for FEATURES (matches inference path)
-            features = _text_to_features(prompt)
-            _stamp_doc_flags(features, prompt, self._pattern_extractor)
+            features = _text_to_features(text)
+            _stamp_doc_flags(features, text, self._pattern_extractor)
             if features:
+                X_train.append(features)
+                y_train.append(labels)
+
+        # Add augmented samples (labels already computed)
+        for text, labels in augmented:
+            features = _text_to_features(text)
+            _stamp_doc_flags(features, text, self._pattern_extractor)
+            if features and len(features) == len(labels):
                 X_train.append(features)
                 y_train.append(labels)
 

@@ -25,6 +25,12 @@ PATTERN_CATEGORIES: dict[str, list[str]] = {
         r"actual\s+instructions?\s*[:=]",
         r"real\s+instructions?\s*[:=]",
         r"updated?\s+instructions?\s*[:=]",
+        # context reset patterns
+        r"start\s+(a\s+)?new\s+(conversation|session|chat|task)",
+        r"reset\s+(your\s+)?(context|memory|instructions?|state)",
+        r"clear\s+(your\s+)?(context|history|memory|state)",
+        r"(wipe|erase)\s+(your\s+)?(memory|context|history)",
+        r"begin\s+(a\s+)?new\s+(session|conversation|chat|context)",
     ],
     "role_injection": [
         r"you\s+are\s+now\s+",
@@ -83,6 +89,34 @@ PATTERN_CATEGORIES: dict[str, list[str]] = {
         r"uncensored\s+(mode|response|version)",
         r"(bypass|skip|avoid)\s+(all\s+)?safeguards?",
     ],
+    "social_engineering": [
+        r"I\s+am\s+(your|the)\s+(developer|creator|admin|owner|engineer|operator)",
+        r"this\s+is\s+(a\s+)?(security|authorized|routine|scheduled)\s+test",
+        r"I\s+have\s+(authorization|permission|clearance|access)",
+        r"(my|the)\s+(boss|manager|supervisor|CEO)\s+(told|asked|wants|requires)\s+(me|you)",
+        r"(trust|believe)\s+me",
+        r"(authorized|approved)\s+(by|from)\s+(management|admin|the\s+team)",
+        r"I\s+am\s+(authorized|permitted|allowed)\s+to",
+        r"this\s+is\s+(an?\s+)?(emergency|urgent|critical)\s+(request|situation|matter)",
+    ],
+    "output_manipulation": [
+        r"respond\s+(only|exclusively)\s+(with|in|using)",
+        r"(do\s+not|don't|never)\s+(mention|include|say|reveal|discuss|reference)",
+        r"(always|must|only)\s+(respond|reply|answer|say)\s+(with|that|as|in)",
+        r"(your|the)\s+(only|sole)\s+(response|output|reply)\s+(is|should|must|will)\s+be",
+        r"format\s+(your\s+)?(response|output|reply)\s+(as|like|in)",
+        r"(say|write|output|type)\s+(exactly|only|nothing\s+but|just)",
+        r"(replace|substitute)\s+(your|the)\s+(response|output|answer)",
+        r"(prepend|append|insert)\s+(the\s+following|this)",
+    ],
+    "multi_turn": [
+        r"as\s+(we|I)\s+(discussed|agreed|established)\s+(earlier|before|previously)",
+        r"(remember|recall)\s+(when|that|our|what)\s+(you|we|I)",
+        r"(continuing|picking\s+up)\s+(from|where)\s+(our|the)\s+(last|previous)",
+        r"in\s+(our|the)\s+(last|previous|earlier)\s+(conversation|session|chat)",
+        r"you\s+(already|previously)\s+(agreed|said|confirmed|promised)",
+        r"as\s+(per|according\s+to)\s+(our|the)\s+(agreement|arrangement|deal)",
+    ],
     "encoding_markers": [
         r"base64\s*[:=]",
         r"decode\s+(this|the\s+following|below)",
@@ -121,20 +155,23 @@ class PatternFeatures:
     """
 
     # Pattern match densities (matches per 1000 chars, capped at 1.0)
-    instruction_override: float
-    role_injection: float
-    system_manipulation: float
-    prompt_leak: float
-    jailbreak_keywords: float
-    encoding_markers: float
-    suspicious_delimiters: float
+    instruction_override: float = 0.0
+    role_injection: float = 0.0
+    system_manipulation: float = 0.0
+    prompt_leak: float = 0.0
+    jailbreak_keywords: float = 0.0
+    social_engineering: float = 0.0
+    output_manipulation: float = 0.0
+    multi_turn: float = 0.0
+    encoding_markers: float = 0.0
+    suspicious_delimiters: float = 0.0
 
     # Text statistics
-    text_length: float  # Length / 10000, capped at 1.0
-    special_char_ratio: float  # Special chars / total chars
-    caps_ratio: float  # Uppercase / alphabetic chars
-    newline_density: float  # Newlines / total chars
-    avg_word_length: float  # Average word length / 20, capped at 1.0
+    text_length: float = 0.0  # Length / 10000, capped at 1.0
+    special_char_ratio: float = 0.0  # Special chars / total chars
+    caps_ratio: float = 0.0  # Uppercase / alphabetic chars
+    newline_density: float = 0.0  # Newlines / total chars
+    avg_word_length: float = 0.0  # Average word length / 20, capped at 1.0
 
     def to_array(self) -> list[float]:
         """Convert to list of floats for classifier input."""
@@ -221,6 +258,9 @@ class PatternExtractor:
             system_manipulation=count_matches("system_manipulation"),
             prompt_leak=count_matches("prompt_leak"),
             jailbreak_keywords=count_matches("jailbreak_keywords"),
+            social_engineering=count_matches("social_engineering"),
+            output_manipulation=count_matches("output_manipulation"),
+            multi_turn=count_matches("multi_turn"),
             encoding_markers=count_matches("encoding_markers"),
             suspicious_delimiters=count_matches("suspicious_delimiters"),
             # Text statistics
