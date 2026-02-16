@@ -7,8 +7,6 @@ detection results can be mapped back to the original document.
 
 from __future__ import annotations
 
-import csv
-import io
 import json
 import re
 import xml.etree.ElementTree as ET
@@ -153,47 +151,102 @@ class CsvExtractor:
         text = raw.decode("utf-8")
         entries: list[ExtractedString] = []
 
-        # Track byte offset at start of each line
-        line_byte_offsets: list[int] = []
-        offset = 0
-        for line in text.split("\n"):
-            line_byte_offsets.append(offset)
-            offset += len(line.encode("utf-8")) + 1  # +1 for \n
+        for row_idx, col_idx, cell, content_start, content_end in self._iter_cells(text):
+            if not cell:
+                continue
 
-        reader = csv.reader(io.StringIO(text))
-        for row_idx, row in enumerate(reader):
-            if row_idx >= len(line_byte_offsets):
-                break
-            line_start = line_byte_offsets[row_idx]
-            # Get the raw line text to locate cells within it
-            raw_line = text.split("\n")[row_idx] if row_idx < len(text.split("\n")) else ""
-            cell_search_from = 0
+            byte_offset = len(text[:content_start].encode("utf-8"))
+            # Use raw in-file content length (inside quotes when quoted).
+            # This preserves accurate byte slicing even when CSV escapes quotes as "".
+            byte_length = len(text[content_start:content_end].encode("utf-8"))
 
-            for col_idx, cell in enumerate(row):
-                if not cell:
-                    continue
-                path = f"{row_idx}:{col_idx}"
-
-                # Find cell content in the raw line
-                # Handle both quoted and unquoted cells
-                cell_pos = raw_line.find(cell, cell_search_from)
-                if cell_pos == -1:
-                    continue
-
-                byte_offset_in_line = len(raw_line[:cell_pos].encode("utf-8"))
-                cell_byte_len = len(cell.encode("utf-8"))
-
-                entries.append(
-                    ExtractedString(
-                        text=cell,
-                        byte_offset=line_start + byte_offset_in_line,
-                        byte_length=cell_byte_len,
-                        path=path,
-                    )
+            entries.append(
+                ExtractedString(
+                    text=cell,
+                    byte_offset=byte_offset,
+                    byte_length=byte_length,
+                    path=f"{row_idx}:{col_idx}",
                 )
-                cell_search_from = cell_pos + len(cell)
+            )
 
         return entries
+
+    @staticmethod
+    def _iter_cells(text: str) -> list[tuple[int, int, str, int, int]]:
+        """Parse CSV text and yield (row, col, value, content_start, content_end).
+
+        ``content_start``/``content_end`` point to the cell's raw in-file content,
+        excluding surrounding quotes for quoted cells.
+        """
+        cells: list[tuple[int, int, str, int, int]] = []
+        n = len(text)
+        i = 0
+        row_idx = 0
+        col_idx = 0
+
+        while i < n:
+            if text[i] == '"':
+                # Quoted field: unescape doubled quotes while tracking raw bounds.
+                i += 1
+                content_start = i
+                chars: list[str] = []
+
+                while i < n:
+                    ch = text[i]
+                    if ch == '"':
+                        if i + 1 < n and text[i + 1] == '"':
+                            chars.append('"')
+                            i += 2
+                            continue
+                        content_end = i
+                        i += 1  # consume closing quote
+                        break
+
+                    chars.append(ch)
+                    i += 1
+                else:
+                    # Unterminated quote: treat remaining text as content.
+                    content_end = n
+
+                cell = "".join(chars)
+
+                # Consume any trailing whitespace before delimiter/newline.
+                while i < n and text[i] not in ",\r\n":
+                    i += 1
+            else:
+                # Unquoted field.
+                content_start = i
+                while i < n and text[i] not in ",\r\n":
+                    i += 1
+                content_end = i
+                cell = text[content_start:content_end]
+
+            cells.append((row_idx, col_idx, cell, content_start, content_end))
+
+            if i >= n:
+                break
+
+            if text[i] == ",":
+                i += 1
+                col_idx += 1
+                continue
+
+            if text[i] == "\r":
+                i += 2 if i + 1 < n and text[i + 1] == "\n" else 1
+                row_idx += 1
+                col_idx = 0
+                continue
+
+            if text[i] == "\n":
+                i += 1
+                row_idx += 1
+                col_idx = 0
+                continue
+
+            # Defensive recovery for unexpected delimiter characters.
+            i += 1
+
+        return cells
 
 
 # ---------------------------------------------------------------------------

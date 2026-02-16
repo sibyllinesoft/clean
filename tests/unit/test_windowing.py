@@ -170,6 +170,22 @@ class TestAdaptiveWindowAnalyzer:
         # Should still detect the injection hotspot
         assert len(result.hotspots) > 0
 
+    def test_adaptive_does_not_leak_window_state_between_calls(self):
+        analyzer = AdaptiveWindowAnalyzer(
+            coarse_window=4096,
+            coarse_step=2048,
+            fine_window=512,
+            fine_step=256,
+        )
+
+        analyzer.analyze("x" * 100)
+        analyzer.analyze("x" * 5000)
+
+        assert analyzer.coarse_window == 4096
+        assert analyzer.coarse_step == 2048
+        assert analyzer.fine_window == 512
+        assert analyzer.fine_step == 256
+
 
 class TestWindowScoring:
     """Tests for window scoring logic."""

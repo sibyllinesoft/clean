@@ -376,17 +376,29 @@ class AdaptiveWindowAnalyzer(SlidingWindowAnalyzer):
         super().__init__(**kwargs)
         self._min_coarse = 1024
         self._max_coarse = 8192
+        self._base_coarse_window = self.coarse_window
+        self._base_coarse_step = self.coarse_step
+        self._base_fine_window = self.fine_window
+        self._base_fine_step = self.fine_step
 
     def analyze(self, text: str) -> AnalysisResult:
         """Analyze with adaptive window sizing."""
         text_len = len(text)
 
+        # Reset to constructor-provided defaults on every call so adaptive
+        # tuning from one document does not leak into subsequent analyses.
+        self.coarse_window = self._base_coarse_window
+        self.coarse_step = self._base_coarse_step
+        self.fine_window = self._base_fine_window
+        self.fine_step = self._base_fine_step
+
         # Short texts: single pass with smaller windows
         if text_len <= self._min_coarse:
-            self.coarse_window = text_len
-            self.coarse_step = text_len
-            self.fine_window = min(512, text_len)
-            self.fine_step = min(256, text_len // 2)
+            short_len = max(1, text_len)
+            self.coarse_window = short_len
+            self.coarse_step = short_len
+            self.fine_window = min(512, short_len)
+            self.fine_step = max(1, min(256, short_len // 2))
 
         # Medium texts: use configured defaults
         elif text_len <= self._max_coarse * 2:
@@ -395,6 +407,6 @@ class AdaptiveWindowAnalyzer(SlidingWindowAnalyzer):
         # Long texts: increase coarse window for efficiency
         else:
             self.coarse_window = min(self._max_coarse, text_len // 4)
-            self.coarse_step = self.coarse_window // 2
+            self.coarse_step = max(1, self.coarse_window // 2)
 
         return super().analyze(text)

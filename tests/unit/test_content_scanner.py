@@ -198,6 +198,17 @@ class TestCsvExtractor:
         texts = {e.text for e in entries}
         assert "has, comma" in texts
 
+    def test_escaped_quotes_fields(self):
+        doc = b'name,desc\nAlice,"say ""hello"" now"'
+        entries = CsvExtractor().extract(doc)
+
+        quoted_entry = next(e for e in entries if e.path == "1:1")
+        assert quoted_entry.text == 'say "hello" now'
+        assert (
+            doc[quoted_entry.byte_offset : quoted_entry.byte_offset + quoted_entry.byte_length]
+            == b'say ""hello"" now'
+        )
+
 
 # -----------------------------------------------------------------------
 # XmlHtmlExtractor

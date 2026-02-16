@@ -92,7 +92,17 @@ class ContentScanner:
 
         # Step 1-2: Extract strings and build virtual text
         extractor = extractor_cls()
-        entries = extractor.extract(raw)
+        try:
+            entries = extractor.extract(raw)
+        except Exception as exc:
+            # Structured parsing can fail on malformed/untrusted payloads.
+            # Fall back to plain-text analysis instead of propagating parser errors.
+            return self._scan_plain_text(
+                raw,
+                content_type,
+                mode="structured_parse_fallback",
+                note=f"{extractor_cls.__name__}: {exc.__class__.__name__}",
+            )
 
         if not entries:
             return ScanResult(
@@ -150,17 +160,27 @@ class ContentScanner:
             content_type=content_type,
         )
 
-    def _scan_plain_text(self, raw: bytes, content_type: str) -> ScanResult:
+    def _scan_plain_text(
+        self,
+        raw: bytes,
+        content_type: str,
+        *,
+        mode: str = "plain_text_fallback",
+        note: str | None = None,
+    ) -> ScanResult:
         """Fallback: scan as plain text without structured extraction."""
         text = raw.decode("utf-8", errors="replace")
         analysis = self._detector.analyze(text)
+        metadata = {"mode": mode}
+        if note:
+            metadata["note"] = note
 
         return ScanResult(
             flagged=analysis.flagged,
             score=analysis.score,
             detections=[],
             annotated=raw,
-            metadata={"mode": "plain_text_fallback"},
+            metadata=metadata,
             content_type=content_type,
         )
 
