@@ -258,7 +258,7 @@ pub fn text_to_features(text: &str) -> Vec<CrfTokenFeatures> {
         }
 
         // Position bucket (10 buckets)
-        let pos_bucket = if n > 0 { (i * 10 / n).min(9) } else { 0 };
+        let pos_bucket = (i * 10).checked_div(n).unwrap_or(0).min(9);
         map.insert("pos".into(), format!("{}", pos_bucket));
 
         // BOS / EOS (independent — not exclusive with context)
