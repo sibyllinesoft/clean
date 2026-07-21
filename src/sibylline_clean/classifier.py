@@ -21,6 +21,17 @@ class InjectionClassifier:
 
     MODEL_FILENAME = "prompt_injection_rf.pkl"
 
+    # The bundled classifier was trained before these pattern categories were
+    # added.  They were inserted into PatternFeatures (rather than appended), so
+    # simply truncating a current feature vector would silently shift the text
+    # statistics into the wrong model columns.
+    _LEGACY_MODEL_FEATURES = 405
+    _LEGACY_OMITTED_PATTERN_FEATURES = (
+        "social_engineering",
+        "output_manipulation",
+        "multi_turn",
+    )
+
     def __init__(self, model_path: Path | None = None):
         """Initialize classifier.
 
@@ -94,9 +105,33 @@ class InjectionClassifier:
         if features.ndim == 1:
             features = features.reshape(1, -1)
 
+        features = self._adapt_feature_schema(features)
+
         # Get probability of positive class (injection = 1)
         proba = self._model.predict_proba(features)[0, 1]
         return float(proba)
+
+    def _adapt_feature_schema(self, features: np.ndarray) -> np.ndarray:
+        """Adapt current features for the legacy bundled classifier schema."""
+        expected = self._model.n_features_in_
+        actual = features.shape[1]
+        if actual == expected:
+            return features
+
+        omitted_count = len(self._LEGACY_OMITTED_PATTERN_FEATURES)
+        if expected == self._LEGACY_MODEL_FEATURES and actual == expected + omitted_count:
+            from .patterns import PatternFeatures
+
+            pattern_names = PatternFeatures.feature_names()
+            omitted_indices = [
+                pattern_names.index(name) for name in self._LEGACY_OMITTED_PATTERN_FEATURES
+            ]
+            return np.delete(features, omitted_indices, axis=1)
+
+        raise ValueError(
+            f"Classifier feature mismatch: received {actual} features, but the model "
+            f"expects {expected}. Retrain the classifier with the current feature schema."
+        )
 
     def predict(self, features: np.ndarray, threshold: float = 0.5) -> bool:
         """Predict whether input is prompt injection.

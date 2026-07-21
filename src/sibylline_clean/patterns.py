@@ -239,7 +239,8 @@ class PatternExtractor:
         def count_matches(category: str) -> float:
             """Count pattern matches, normalized by text length."""
             total = sum(
-                len(pattern.findall(normalized_text)) for pattern in self._compiled[category]
+                len(pattern.findall(normalized_text))
+                for pattern in self._compiled.get(category, [])
             )
             # Normalize: matches per 1000 chars, capped at 1.0
             return min(total * 1000 / text_len, 1.0)
